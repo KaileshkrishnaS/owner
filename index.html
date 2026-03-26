@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SK Products - Admin Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0d0d; --surface: #161616; --surface2: #1f1f1f; --border: #2a2a2a;
+    --gold: #c9a84c; --text: #f0ede8; --text-muted: #888;
+    --success: #2d6a4f; 
+    --success-bright: #52b788;
+    --danger: #e05252;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+  
+  .page { display: none; flex: 1; flex-direction: column; height: 100%; width: 100%; }
+  .page.active { display: flex; }
+  
+  .login-container { margin: auto; width: 100%; max-width: 400px; background: var(--surface); padding: 2rem; border-radius: 16px; border: 1px solid var(--border); text-align: center; }
+  .field { margin-bottom: 1.5rem; text-align: left; }
+  .field label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem; text-transform: uppercase; }
+  .field input { width: 100%; background: var(--surface2); border: 1px solid var(--border); padding: 1rem; border-radius: 8px; color: #fff; font-size: 1rem; outline: none; }
+  
+  .btn-main { width: 100%; background: var(--gold); color: #000; border: none; padding: 1rem; border-radius: 8px; font-weight: 700; font-size: 1rem; cursor: pointer; transition: 0.2s; }
+  .btn-main:hover { opacity: 0.9; }
+  .btn-main:disabled { opacity: 0.5; cursor: wait; }
+
+  header { height: 70px; display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; border-bottom: 1px solid var(--border); background: var(--surface); }
+  .live-indicator { display: flex; align-items: center; gap: 8px; color: var(--success-bright); font-size: 0.9rem; font-weight: bold; }
+  .dot { width: 10px; height: 10px; background: var(--success-bright); border-radius: 50%; animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0% { transform: scale(0.95); opacity: 0.5; } 50% { transform: scale(1.2); opacity: 1; } 100% { transform: scale(0.95); opacity: 0.5; } }
+
+  .dashboard-content { flex: 1; overflow-y: auto; padding: 2rem; max-width: 1000px; margin: 0 auto; width: 100%; }
+  .order-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; cursor: pointer; transition: 0.2s; display: flex; justify-content: space-between; align-items: center; }
+  .order-card:hover { border-color: var(--gold); transform: translateY(-2px); }
+  .order-card.closed { background: var(--success); border-color: var(--success-bright); }
+  
+  .order-info { display: flex; flex-direction: column; gap: 5px; }
+  .order-name { font-size: 1.2rem; font-weight: bold; color: var(--gold); }
+  .order-card.closed .order-name { color: #fff; }
+  .order-time { font-size: 0.9rem; color: var(--text-muted); }
+  .order-card.closed .order-time { color: #ddd; }
+  .order-status { padding: 5px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; background: var(--surface2); border: 1px solid var(--border); }
+  .order-card.closed .order-status { background: rgba(0,0,0,0.2); border: none; }
+
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 2000; display: flex; align-items: center; justify-content: center; }
+  .modal-overlay.hidden { display: none; }
+  .modal-content { background: var(--surface); border-radius: 16px; border: 1px solid var(--border); width: 90%; max-width: 500px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
+  
+  /* Modal Sections */
+  .modal-header { padding: 1.5rem; border-bottom: 1px solid var(--border); position: relative; }
+  .modal-body { padding: 1.5rem; overflow-y: auto; flex: 1; }
+  .modal-footer { padding: 1.5rem; border-top: 1px solid var(--border); background: var(--surface2); }
+  
+  .item-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px dashed var(--border); }
+  .item-row:last-child { border-bottom: none; }
+  .item-name { font-weight: bold; flex: 2; }
+  .item-qty { flex: 1; text-align: center; color: var(--text-muted); }
+  .item-price { flex: 1; text-align: right; color: var(--gold); font-weight: bold; }
+
+  .close-btn { background: var(--success-bright); color: #000; font-weight: bold; border: none; padding: 1rem; width: 100%; border-radius: 8px; cursor: pointer; font-size: 1.1rem; margin-top: 1rem; transition: 0.2s; }
+  .close-btn:hover { background: #40916c; color: white; }
+</style>
+</head>
+<body>
+
+<div class="page active" id="page-login">
+  <div class="login-container">
+    <h2 style="color: var(--gold); margin-bottom: 1.5rem;">Shop Admin System</h2>
+    <div class="field">
+      <label>User ID</label>
+      <input type="text" id="admin-id" placeholder="Enter User ID">
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="admin-pass" placeholder="Enter Password">
+    </div>
+    <button class="btn-main" onclick="handleLogin()">Login to Dashboard</button>
+    <p id="login-error" style="color: var(--danger); margin-top: 1rem; font-size: 0.9rem; display: none;">Invalid ID or Password</p>
+  </div>
+</div>
+
+<div class="page" id="page-dashboard">
+  <header>
+    <div style="font-size: 1.5rem; font-weight: 700; color: var(--gold);">SK Products Admin</div>
+    <div class="live-indicator"><div class="dot"></div> Live Updates Active</div>
+  </header>
+  <div class="dashboard-content">
+    <h2 style="margin-bottom: 1.5rem;">Recent Orders</h2>
+    <div id="orders-list">
+      <p style="text-align: center; color: var(--text-muted);">Fetching orders...</p>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="order-modal" onclick="if(event.target===this) closeModal()">
+  <div class="modal-content">
+    
+    <div class="modal-header">
+      <button onclick="closeModal()" style="background:none; border:none; color:#888; font-size:2rem; cursor:pointer; position:absolute; right:15px; top:10px; line-height:1;">&times;</button>
+      
+      <h2 id="m-name" style="color: var(--gold); margin-bottom: 15px; font-size: 1.6rem; padding-right: 30px;">Customer Name</h2>
+
+      <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
+        <div style="display: flex; align-items: flex-start; gap: 10px;">
+          <span style="font-size: 1.1rem;">📍</span>
+          <span id="m-address" style="color: var(--text); font-size: 1rem; line-height: 1.4;">Address</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 1.1rem;">🚚</span>
+          <span id="m-slot" style="color: var(--text-muted); font-size: 1rem;">Slot</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+           <span style="font-size: 1.1rem;">📞</span>
+           <span id="m-phone-text" style="color: var(--text-muted); font-size: 1rem;">Phone</span>
+        </div>
+      </div>
+
+      <div id="m-call-btn-container"></div>
+    </div>
+    
+    <div class="modal-body">
+      <div style="display: flex; justify-content: space-between; color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; margin-bottom: 10px;">
+        <span style="flex: 2;">Product Name</span>
+        <span style="flex: 1; text-align: center;">Qty</span>
+        <span style="flex: 1; text-align: right;">Price (₹)</span>
+      </div>
+      <div id="m-items"></div>
+    </div>
+    
+    <div class="modal-footer">
+      <div style="display: flex; justify-content: space-between; font-size: 1.3rem; font-weight: bold; margin-bottom: 10px;">
+        <span>Total Amount:</span>
+        <span id="m-total" style="color: var(--gold);">₹0</span>
+      </div>
+      <button id="m-action-btn" class="close-btn" onclick="markOrderClosed()">Close Order</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// IMPORTANT: Paste your Google Apps Script URL here!
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxd-VY1Ji4wp68Bo5v6S8RdRUQIukc0ziDM2F86y2FepriByhftQhxNUIGeJxGLhNIH/exec';
+
+let allOrders = [];
+let currentOpenRowId = null;
+let pollingInterval = null;
+
+let previousOrderCount = -1; 
+const alertSound = new Audio('https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg');
+alertSound.loop = true; 
+
+function formatNiceDate(isoString) {
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return isoString; 
+  
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  
+  let hours = d.getHours();
+  let minutes = String(d.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  
+  hours = hours % 12;
+  hours = hours ? hours : 12; 
+  
+  return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
+}
+
+function handleLogin() {
+  const id = document.getElementById('admin-id').value;
+  const pass = document.getElementById('admin-pass').value;
+  
+  if (id === 'onlineshopping' && pass === 'skproducts') {
+    
+    alertSound.volume = 0; 
+    alertSound.play().then(() => {
+        alertSound.pause();
+        alertSound.currentTime = 0;
+        alertSound.volume = 1; 
+    }).catch(e => console.log("Audio unlock pending:", e));
+
+    document.getElementById('page-login').classList.remove('active');
+    document.getElementById('page-dashboard').classList.add('active');
+    
+    fetchOrders();
+    pollingInterval = setInterval(fetchOrders, 10000); 
+  } else {
+    document.getElementById('login-error').style.display = 'block';
+  }
+}
+
+function playAlertSound() {
+    alertSound.currentTime = 0;
+    alertSound.play().catch(e => console.log("Audio play blocked by browser:", e));
+    
+    setTimeout(() => {
+        alertSound.pause();
+        alertSound.currentTime = 0; 
+    }, 5000);
+}
+
+function fetchOrders() {
+  fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    redirect: 'follow',
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action: 'getOrders' })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      allOrders = data.orders; 
+      
+      if (previousOrderCount !== -1 && allOrders.length > previousOrderCount) {
+          playAlertSound();
+      }
+      
+      previousOrderCount = allOrders.length;
+      renderOrders();
+    }
+  })
+  .catch(err => console.error("Error fetching orders:", err));
+}
+
+function renderOrders() {
+  const list = document.getElementById('orders-list');
+  
+  if (allOrders.length === 0) {
+    list.innerHTML = `<p style="text-align: center; color: var(--text-muted);">No orders found.</p>`;
+    return;
+  }
+
+  list.innerHTML = allOrders.map(order => {
+    const isClosed = order.status === 'Closed';
+    const cardClass = isClosed ? 'order-card closed' : 'order-card';
+    const formattedDate = formatNiceDate(order.date);
+    
+    return `
+      <div class="${cardClass}" onclick="openOrderModal(${order.rowId})">
+        <div class="order-info">
+          <span class="order-name">${order.name}</span>
+          <span class="order-time">${formattedDate}</span>
+        </div>
+        <div class="order-status">${order.status}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function openOrderModal(rowId) {
+  const order = allOrders.find(o => o.rowId === rowId);
+  if (!order) return;
+  
+  currentOpenRowId = rowId;
+
+  // Insert Customer Info cleanly into the designated spots
+  document.getElementById('m-name').innerText = order.name;
+  document.getElementById('m-address').innerText = order.address;
+  document.getElementById('m-slot').innerText = order.slot || 'No slot selected';
+  document.getElementById('m-phone-text').innerText = order.phone;
+
+  // Generate the Full-Width Call Button
+  document.getElementById('m-call-btn-container').innerHTML = `
+    <a href="tel:${order.phone}" style="background:var(--success-bright); color:#000; padding:12px; width:100%; border-radius:8px; font-weight:bold; font-size:1.1rem; text-decoration:none; display:block; text-align:center; transition: 0.2s;">📞 Call Customer</a>
+  `;
+  
+  document.getElementById('m-total').innerText = `₹${order.total}`;
+
+  // Parse Cart
+  let items = [];
+  try { items = JSON.parse(order.cart); } catch(e) { items = []; }
+
+  document.getElementById('m-items').innerHTML = items.map(item => `
+    <div class="item-row">
+      <span class="item-name">${item.name}</span>
+      <span class="item-qty">x${item.qty}</span>
+      <span class="item-price">₹${item.price * item.qty}</span>
+    </div>
+  `).join('');
+
+  // Handle the Close Button State
+  const actionBtn = document.getElementById('m-action-btn');
+  if (order.status === 'Closed') {
+    actionBtn.innerText = "Order is Closed";
+    actionBtn.style.background = "var(--surface2)";
+    actionBtn.style.color = "var(--text-muted)";
+    actionBtn.disabled = true;
+  } else {
+    actionBtn.innerText = "Close Order";
+    actionBtn.style.background = "var(--success-bright)";
+    actionBtn.style.color = "#000";
+    actionBtn.disabled = false;
+  }
+
+  document.getElementById('order-modal').classList.remove('hidden');
+}
+
+function closeModal() {
+  document.getElementById('order-modal').classList.add('hidden');
+  currentOpenRowId = null;
+}
+
+function markOrderClosed() {
+  if (!currentOpenRowId) return;
+  
+  const actionBtn = document.getElementById('m-action-btn');
+  actionBtn.innerText = "Closing...";
+  actionBtn.disabled = true;
+
+  fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    redirect: 'follow',
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action: 'updateStatus', rowId: currentOpenRowId, status: 'Closed' })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      closeModal();
+      fetchOrders(); 
+    } else {
+      alert("Failed to update status.");
+      actionBtn.innerText = "Close Order";
+      actionBtn.disabled = false;
+    }
+  })
+  .catch(err => {
+    console.error("Update error:", err);
+    alert("Network error.");
+    actionBtn.innerText = "Close Order";
+    actionBtn.disabled = false;
+  });
+}
+</script>
+</body>
+</html>
