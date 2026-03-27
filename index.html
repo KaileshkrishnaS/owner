@@ -50,7 +50,6 @@
   .modal-overlay.hidden { display: none; }
   .modal-content { background: var(--surface); border-radius: 16px; border: 1px solid var(--border); width: 90%; max-width: 500px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
   
-  /* Modal Sections */
   .modal-header { padding: 1.5rem; border-bottom: 1px solid var(--border); position: relative; }
   .modal-body { padding: 1.5rem; overflow-y: auto; flex: 1; }
   .modal-footer { padding: 1.5rem; border-top: 1px solid var(--border); background: var(--surface2); }
@@ -63,6 +62,9 @@
 
   .close-btn { background: var(--success-bright); color: #000; font-weight: bold; border: none; padding: 1rem; width: 100%; border-radius: 8px; cursor: pointer; font-size: 1.1rem; margin-top: 1rem; transition: 0.2s; }
   .close-btn:hover { background: #40916c; color: white; }
+  
+  .remove-btn { background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 5px 10px; border-radius: 8px; font-size: 0.8rem; font-weight: bold; cursor: pointer; transition: 0.2s; margin-left: 10px; }
+  .remove-btn:hover { background: var(--danger); color: #fff; }
 </style>
 </head>
 <body>
@@ -98,12 +100,9 @@
 
 <div class="modal-overlay hidden" id="order-modal" onclick="if(event.target===this) closeModal()">
   <div class="modal-content">
-    
     <div class="modal-header">
       <button onclick="closeModal()" style="background:none; border:none; color:#888; font-size:2rem; cursor:pointer; position:absolute; right:15px; top:10px; line-height:1;">&times;</button>
-      
       <h2 id="m-name" style="color: var(--gold); margin-bottom: 15px; font-size: 1.6rem; padding-right: 30px;">Customer Name</h2>
-
       <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
         <div style="display: flex; align-items: flex-start; gap: 10px;">
           <span style="font-size: 1.1rem;">📍</span>
@@ -118,10 +117,8 @@
            <span id="m-phone-text" style="color: var(--text-muted); font-size: 1rem;">Phone</span>
         </div>
       </div>
-
       <div id="m-call-btn-container"></div>
     </div>
-    
     <div class="modal-body">
       <div style="display: flex; justify-content: space-between; color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; margin-bottom: 10px;">
         <span style="flex: 2;">Product Name</span>
@@ -130,7 +127,6 @@
       </div>
       <div id="m-items"></div>
     </div>
-    
     <div class="modal-footer">
       <div style="display: flex; justify-content: space-between; font-size: 1.3rem; font-weight: bold; margin-bottom: 10px;">
         <span>Total Amount:</span>
@@ -142,7 +138,7 @@
 </div>
 
 <script>
-// IMPORTANT: Paste your Google Apps Script URL here!
+// IMPORTANT: Paste your NEW Google Apps Script URL here!
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxd-VY1Ji4wp68Bo5v6S8RdRUQIukc0ziDM2F86y2FepriByhftQhxNUIGeJxGLhNIH/exec';
 
 let allOrders = [];
@@ -156,18 +152,14 @@ alertSound.loop = true;
 function formatNiceDate(isoString) {
   const d = new Date(isoString);
   if (isNaN(d.getTime())) return isoString; 
-  
   const day = String(d.getDate()).padStart(2, '0');
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const year = d.getFullYear();
-  
   let hours = d.getHours();
   let minutes = String(d.getMinutes()).padStart(2, '0');
   const ampm = hours >= 12 ? 'PM' : 'AM';
-  
   hours = hours % 12;
   hours = hours ? hours : 12; 
-  
   return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
 }
 
@@ -176,7 +168,6 @@ function handleLogin() {
   const pass = document.getElementById('admin-pass').value;
   
   if (id === 'onlineshopping' && pass === 'skproducts') {
-    
     alertSound.volume = 0; 
     alertSound.play().then(() => {
         alertSound.pause();
@@ -197,7 +188,6 @@ function handleLogin() {
 function playAlertSound() {
     alertSound.currentTime = 0;
     alertSound.play().catch(e => console.log("Audio play blocked by browser:", e));
-    
     setTimeout(() => {
         alertSound.pause();
         alertSound.currentTime = 0; 
@@ -215,11 +205,9 @@ function fetchOrders() {
   .then(data => {
     if (data.success) {
       allOrders = data.orders; 
-      
       if (previousOrderCount !== -1 && allOrders.length > previousOrderCount) {
           playAlertSound();
       }
-      
       previousOrderCount = allOrders.length;
       renderOrders();
     }
@@ -246,10 +234,49 @@ function renderOrders() {
           <span class="order-name">${order.name}</span>
           <span class="order-time">${formattedDate}</span>
         </div>
-        <div class="order-status">${order.status}</div>
+        <div style="display:flex; align-items:center;">
+          <div class="order-status">${order.status}</div>
+          <button class="remove-btn" onclick="deleteOrder(event, ${order.rowId})">Remove</button>
+        </div>
       </div>
     `;
   }).join('');
+}
+
+// NEW FUNCTION: Delete Order
+function deleteOrder(event, rowId) {
+  event.stopPropagation(); // Prevents the order modal from opening when clicking Remove
+  
+  if(!confirm("Are you sure you want to permanently delete this order?")) return;
+
+  // Change button text briefly to show action is happening
+  const btn = event.target;
+  btn.innerText = "Deleting...";
+  btn.disabled = true;
+
+  fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    redirect: 'follow',
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action: 'deleteOrder', rowId: rowId })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      // Refresh the orders list to reflect the deletion
+      fetchOrders(); 
+    } else {
+      alert("Failed to delete order.");
+      btn.innerText = "Remove";
+      btn.disabled = false;
+    }
+  })
+  .catch(err => {
+    console.error("Delete error:", err);
+    alert("Network error.");
+    btn.innerText = "Remove";
+    btn.disabled = false;
+  });
 }
 
 function openOrderModal(rowId) {
@@ -258,20 +285,17 @@ function openOrderModal(rowId) {
   
   currentOpenRowId = rowId;
 
-  // Insert Customer Info cleanly into the designated spots
   document.getElementById('m-name').innerText = order.name;
   document.getElementById('m-address').innerText = order.address;
   document.getElementById('m-slot').innerText = order.slot || 'No slot selected';
   document.getElementById('m-phone-text').innerText = order.phone;
 
-  // Generate the Full-Width Call Button
   document.getElementById('m-call-btn-container').innerHTML = `
     <a href="tel:${order.phone}" style="background:var(--success-bright); color:#000; padding:12px; width:100%; border-radius:8px; font-weight:bold; font-size:1.1rem; text-decoration:none; display:block; text-align:center; transition: 0.2s;">📞 Call Customer</a>
   `;
   
   document.getElementById('m-total').innerText = `₹${order.total}`;
 
-  // Parse Cart
   let items = [];
   try { items = JSON.parse(order.cart); } catch(e) { items = []; }
 
@@ -283,7 +307,6 @@ function openOrderModal(rowId) {
     </div>
   `).join('');
 
-  // Handle the Close Button State
   const actionBtn = document.getElementById('m-action-btn');
   if (order.status === 'Closed') {
     actionBtn.innerText = "Order is Closed";
